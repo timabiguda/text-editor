@@ -7,6 +7,15 @@ let underlineBtn=document.querySelector('.tef1-underline-btn');
 let aboveRegBtn=document.querySelector('.tef1-aboveReg-btn');
 let underRegBtn=document.querySelector('.tef1-underReg-btn');
 
+const btnKeys={
+    em: italicBtn,
+    strong: boldBtn,
+    del: strokeBtn,
+    u: underlineBtn,
+    sup: aboveRegBtn,
+    sub: underRegBtn
+};
+
 //хранит состояния стилей (вкл/выкл)
 let formateStatesList={
     em: false,
@@ -45,6 +54,36 @@ function resetFormateStatesList(){
     }
 }
 
+function updateBtnUI(){
+    for(let key in btnKeys){
+        if(btnKeys[key]){
+            btnKeys[key].classList.toggle('active',formateStatesList[key]);
+            //formateStatesList[key]
+            //    ?btnKeys[key].classList.add('active')
+            //    :btnKeys[key].classList.remove('active');
+        }
+    }
+}
+
+function checkCursorStyles() {
+    const range=getRangeSelected();
+    if(!range)return;
+    resetFormateStatesList();
+
+    let parent=range.commonAncestorContainer;
+    if(parent.nodeType===Node.TEXT_NODE){
+        parent=parent.parentNode;
+    }
+    while(parent&&parent!==textEditor){
+        const tagName=parent.tagName.toLowerCase();
+        if(tagName in formateStatesList){
+            formateStatesList[tagName]=true;
+        }
+        parent=parent.parentNode;
+    }
+    updateBtnUI();
+}
+
 
 function removeTag(range,tagName){
     if(!tagName)return false;
@@ -72,7 +111,7 @@ function formateSelectedText(range,pressedTag){
     // if(!range||range.toString().length===0)return;
     if(removeTag(range,pressedTag)){
         window.getSelection().removeAllRanges();
-        resetFormateStatesList();
+        checkCursorStyles();
         return;
     }
 
@@ -92,14 +131,14 @@ function formateSelectedText(range,pressedTag){
     range.insertNode(parentElement);
 
     window.getSelection().removeAllRanges();
-    resetFormateStatesList();
+    checkCursorStyles();
 }
 
 
 //вставляет теги в место где курсор
 function formateEnteringText(range,pressedTag){
     if(removeTag(range,pressedTag)){
-        resetFormateStatesList();
+        checkCursorStyles();
         return;
     }
     const activeTags=formateState();
@@ -127,7 +166,7 @@ function formateEnteringText(range,pressedTag){
     selection.removeAllRanges();
     selection.addRange(newRange);
     
-    resetFormateStatesList();
+    updateBtnUI();
 }
 
 //добавить форматирование текста, который пишет пользователь
@@ -154,25 +193,25 @@ function chooseFormBtn(e){
     }
     else if(e.ctrlKey||e.metaKey){
         switch(e.key.toLowerCase()){
-            case 'i':
+            case'i':case'ш':
                 e.preventDefault();
                 formateStatesList.em=!formateStatesList.em;
                 isFormattingKey=true;
                 pressedTag='em';
                 break;
-            case 'b':
+            case 'b':case'и':
                 e.preventDefault();
                 formateStatesList.strong=!formateStatesList.strong;
                 isFormattingKey=true;
                 pressedTag='strong';
                 break;
-            case 'd':
+            case 'd':case'в':
                 e.preventDefault();
                 formateStatesList.del=!formateStatesList.del;
                 isFormattingKey=true;
                 pressedTag='del';
                 break;
-            case 'u':
+            case 'u':case'г':
                 e.preventDefault();
                 formateStatesList.u=!formateStatesList.u;
                 isFormattingKey=true;
@@ -200,5 +239,6 @@ textEditor.addEventListener('keydown',(e)=>{
     // if()   sth for buttons if text was not selected
     chooseFormBtn(e);
 })
-
-
+textEditor.addEventListener('mouseup',()=>{
+    checkCursorStyles();
+});
