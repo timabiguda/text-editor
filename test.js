@@ -137,10 +137,31 @@ function formateSelectedText(range,pressedTag){
 
 //вставляет теги в место где курсор
 function formateEnteringText(range,pressedTag){
-    if(removeTag(range,pressedTag)){
+    let parent=range.commonAncestorContainer;
+    if(parent.nodeType===Node.TEXT_NODE){
+        parent=parent.parentNode;
+    }
+
+    const closestTag = parent.closest(pressedTag);
+    if(closestTag&&textEditor.contains(closestTag)){
+        const dietSpace=document.createTextNode('\u200B');        
+        closestTag.parentNode.insertBefore(dietSpace, closestTag.nextSibling);
+
+        const selection=window.getSelection();
+        const newRange=document.createRange();
+        newRange.setStart(dietSpace,1);
+        newRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(newRange);
+
         checkCursorStyles();
         return;
     }
+
+    // if(removeTag(range,pressedTag)){
+    //     checkCursorStyles();
+    //     return;
+    // }
     const activeTags=formateState();
     if(activeTags.length===0)return;
 
@@ -169,7 +190,6 @@ function formateEnteringText(range,pressedTag){
     updateBtnUI();
 }
 
-//добавить форматирование текста, который пишет пользователь
 
 function chooseFormBtn(e){
     let isFormattingKey=false;
@@ -219,16 +239,11 @@ function chooseFormBtn(e){
                 break;
         }
     }
-
     if(isFormattingKey){
         const range = getRangeSelected();
         if(!range)return;
         const hasSelection=range.toString().length>0;
-        if(hasSelection){
-            formateSelectedText(range,pressedTag);
-        }else{
-            formateEnteringText(range,pressedTag);
-        }
+        hasSelection?formateSelectedText(range,pressedTag):formateEnteringText(range,pressedTag);
     }
 }
 
@@ -242,3 +257,27 @@ textEditor.addEventListener('keydown',(e)=>{
 textEditor.addEventListener('mouseup',()=>{
     checkCursorStyles();
 });
+textEditor.addEventListener('keyup',(e)=>{
+    if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey){
+        checkCursorStyles();
+    }
+});
+
+function initClickButtons(){
+    Object.keys(btnKeys).forEach(tag=>{
+        const btn=btnKeys[tag];
+        if(!btn)return;
+        btn.addEventListener('click',(e)=>{
+            e.preventDefault();
+            textEditor.focus();
+
+            const range=getRangeSelected();
+            if(!range)return;
+            formateStatesList[tag]=!formateStatesList[tag];
+            const hasSelection=range.toString().length>0;
+
+            hasSelection?formateSelectedText(range,tag):formateEnteringText(range,tag);
+        });
+    });
+}
+initClickButtons();
