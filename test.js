@@ -267,13 +267,14 @@ function initClickButtons(){
     Object.keys(btnKeys).forEach(tag=>{
         const btn=btnKeys[tag];
         if(!btn)return;
-        btn.addEventListener('click',(e)=>{
+        btn.addEventListener('mousedown',(e)=>{
             e.preventDefault();
             textEditor.focus();
 
             const range=getRangeSelected();
             if(!range)return;
             formateStatesList[tag]=!formateStatesList[tag];
+
             const hasSelection=range.toString().length>0;
 
             hasSelection?formateSelectedText(range,tag):formateEnteringText(range,tag);

@@ -1,10 +1,30 @@
 *:focus, *:active {
     outline: none; 
 }
-
+.tef1{
+    display: flex;
+    flex-direction: row;
+}
 .tef1 button{
-    height:25px;
-    width: 25px
+    padding: 2px; 
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height:auto;
+    width: auto;
+    background-color: transparent;
+}
+.tef1 button:hover{
+    cursor:pointer
+}
+.tef1 button:hover svg{
+    fill: #008a93;
+}
+.tef1 button svg{
+    width: 24px;
+    height: 24px;    
+    object-fit: contain;
 }
 
 .text-editor-content{
@@ -13,4 +33,3 @@
     background-color: antiquewhite;
     border: 1px solid #000000 !important;
 }
-
