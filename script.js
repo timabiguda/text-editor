@@ -6,6 +6,7 @@ let strokeBtn=document.querySelector('.tef1-stroke-btn');
 let underlineBtn=document.querySelector('.tef1-underline-btn');
 let aboveRegBtn=document.querySelector('.tef1-aboveReg-btn');
 let underRegBtn=document.querySelector('.tef1-underReg-btn');
+let clearBtn=document.querySelector('.tef1-clear-btn');
 
 const btnKeys={
     em: italicBtn,
@@ -16,7 +17,7 @@ const btnKeys={
     sub: underRegBtn
 };
 
-//хранит состояния стилей (вкл/выкл)
+//состояния стилей
 let formateStatesList={
     em: false,
     strong: false,
@@ -172,9 +173,9 @@ function formateEnteringText(range,pressedTag){
     activeTags.forEach((tag, index)=>{
         const newElement=document.createElement(tag);
         index===0?parentElement=newElement:innerElement.appendChild(newElement)
-        innerElement = newElement;
+        innerElement=newElement;
     });
-    const dietSpace = document.createTextNode('\u200B');
+    const dietSpace=document.createTextNode('\u200B');
     innerElement.appendChild(dietSpace);
 
     range.deleteContents();
@@ -196,7 +197,7 @@ let undoArr=[];
 let redoArr=[];
 const MAX_HISTORY=50;
 
-function saveState(){
+function saveState(clearRedo=true){
     const currentState=textEditor.innerHTML;
     
     if(undoArr.length>0&&undoArr[undoArr.length-1]===currentState)return;
@@ -217,7 +218,6 @@ function undo(){
 
 function redo(){
     if(redoArr.length===0)return;
-    
     const nextState=redoArr.pop();
     undoArr.push(textEditor.innerHTML);
     textEditor.innerHTML=nextState;
@@ -248,30 +248,49 @@ function cleanPaste(e){
     saveState();
     checkCursorStyles();
 }
-
-function placeCaretAtEnd(el){
-    el.focus();
-    const selection=window.getSelection();
-    const range=document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(false);
-    selection.removeAllRanges();
-    selection.addRange(range);
-}
+//говно сделал
+// function placeCursorAtEnd(el){
+//     el.focus();
+//     const selection=window.getSelection();
+//     const range=document.createRange();
+//     range.selectNodeContents(el);
+//     range.collapse(false);
+//     selection.removeAllRanges();
+//     selection.addRange(range);
+// }
 
 //очистка
 function clearFormatting(){
-    const range=getRangeSelected();
-    if(!range||range.toString().length===0)return;
-
-    saveState();
-    const plainText=range.toString();
-    range.deleteContents();
-
-    const textNode=document.createTextNode(plainText);
-    range.insertNode(textNode);
-
     const selection=window.getSelection();
+    if(!selection||selection.rangeCount===0)return;
+    const range=selection.getRangeAt(0);
+    if(range.collapsed){
+        resetFormateStatesList();
+        updateBtnUI();
+        return;
+    }
+    saveState();
+
+    const frag=range.extractContents();
+    const cleanText=frag.textContent||'';
+    const textNode=document.createTextNode(cleanText);
+
+    range.insertNode(textNode);
+    const formattingTags=['STRONG','EM','U','DEL','SUP','SUB'];
+    let current=textNode.parentNode;
+    while(current&&current!==textEditor){
+        const parent=current.parentNode;
+        if(formattingTags.includes(current.tagName)){
+            while(current.firstChild){
+                parent.insertBefore(current.firstChild,current);
+            }
+            parent.removeChild(current);
+            current=parent;
+        }else{
+            current=parent;
+        }
+    }
+
     const newRange=document.createRange();
     newRange.selectNodeContents(textNode);
     selection.removeAllRanges();
@@ -279,12 +298,13 @@ function clearFormatting(){
 
     resetFormateStatesList();
     updateBtnUI();
+    isWordBoundary=true;
 }
 
 //-----
 saveState();
 
-let isWordBoundary = true;
+let isWordBoundary=true;
 textEditor.addEventListener('beforeinput',(e)=>{
     if(e.inputType==='historyUndo'){
         e.preventDefault();
@@ -304,9 +324,7 @@ textEditor.addEventListener('beforeinput',(e)=>{
         saveState();
         isWordBoundary=false;
     }
-    if(isSpaceOrEnter||isDelete){
-        isWordBoundary=true;
-    }
+    if(isSpaceOrEnter||isDelete)isWordBoundary=true;
 });
 
 // textEditor.addEventListener('input',(e)=>{
@@ -340,6 +358,13 @@ function chooseFormBtn(e){
 
     let isFormattingKey=false;
     let pressedTag='';
+    if(e.ctrlKey||e.metaKey){
+        if(e.code==='Backslash'||e.code==='Space'){
+            e.preventDefault();
+            clearFormatting();
+            return;
+        }
+    }
 
     if((e.ctrlKey||e.metaKey)&&e.shiftKey){
         switch(e.code){
@@ -402,11 +427,11 @@ textEditor.addEventListener('keyup',(e)=>{
     if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey)checkCursorStyles();
 });
 textEditor.addEventListener('paste',(e)=>{
-    isWordBoundary = true;
+    isWordBoundary=true;
     cleanPaste(e);
 })
 
-function initClickButtons(){
+function initClickBtns(){
     Object.keys(btnKeys).forEach(tag=>{
         const btn=btnKeys[tag];
         if(!btn)return;
@@ -426,4 +451,10 @@ function initClickButtons(){
         });
     });
 }
-initClickButtons();
+
+clearBtn.addEventListener('mousedown',(e)=>{
+    e.preventDefault();
+    textEditor.focus();
+    clearFormatting();
+});
+initClickBtns();
