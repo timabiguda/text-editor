@@ -137,6 +137,7 @@ function formateSelectedText(range,pressedTag){
 
 //вставляет теги в место где курсор
 function formateEnteringText(range,pressedTag){
+    if(!range)return;
     let parent=range.commonAncestorContainer;
     if(parent.nodeType===Node.TEXT_NODE){
         parent=parent.parentNode;
@@ -190,8 +191,153 @@ function formateEnteringText(range,pressedTag){
     updateBtnUI();
 }
 
+//ctrl z|c|y
+let undoArr=[];
+let redoArr=[];
+const MAX_HISTORY=50;
+
+function saveState(){
+    const currentState=textEditor.innerHTML;
+    
+    if(undoArr.length>0&&undoArr[undoArr.length-1]===currentState)return;
+    undoArr.push(currentState);
+    if(undoArr.length>MAX_HISTORY)undoArr.shift();
+    if(clearRedo)redoArr=[];
+}
+
+function undo(){
+    if(undoArr.length<=1)return;
+    const currentState=undoArr.pop();
+    redoArr.push(currentState);
+    const prevState=undoArr[undoArr.length-1];
+    textEditor.innerHTML=prevState;
+
+    checkCursorStyles();
+}
+
+function redo(){
+    if(redoArr.length===0)return;
+    
+    const nextState=redoArr.pop();
+    undoArr.push(textEditor.innerHTML);
+    textEditor.innerHTML=nextState;
+
+    checkCursorStyles();
+}
+
+
+function cleanPaste(e){
+    e.preventDefault();
+    saveState();
+
+    const plainText=(e.clipboardData||window.clipboardData).getData('text/plain');
+    const selection=window.getSelection();
+    if(!selection.rangeCount)return;
+
+    const range=selection.getRangeAt(0);
+    range.deleteContents();
+
+    const textNode=document.createTextNode(plainText);
+    range.insertNode(textNode);
+
+    range.setStartAfter(textNode);
+    range.setEndAfter(textNode);
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    saveState();
+    checkCursorStyles();
+}
+
+function placeCaretAtEnd(el){
+    el.focus();
+    const selection=window.getSelection();
+    const range=document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
+//очистка
+function clearFormatting(){
+    const range=getRangeSelected();
+    if(!range||range.toString().length===0)return;
+
+    saveState();
+    const plainText=range.toString();
+    range.deleteContents();
+
+    const textNode=document.createTextNode(plainText);
+    range.insertNode(textNode);
+
+    const selection=window.getSelection();
+    const newRange=document.createRange();
+    newRange.selectNodeContents(textNode);
+    selection.removeAllRanges();
+    selection.addRange(newRange);
+
+    resetFormateStatesList();
+    updateBtnUI();
+}
+
+//-----
+saveState();
+
+let isWordBoundary = true;
+textEditor.addEventListener('beforeinput',(e)=>{
+    if(e.inputType==='historyUndo'){
+        e.preventDefault();
+        undo();
+        return;
+    }
+    if(e.inputType==='historyRedo'){
+        e.preventDefault();
+        redo();
+        return;
+    }
+    // if(e.inputType.startsWith('delete')||e.data===' ')saveState();
+
+    const isDelete=e.inputType.startsWith('delete');
+    const isSpaceOrEnter=e.data===' '||e.inputType==='insertLineBreak';
+    if(isDelete||isSpaceOrEnter||isWordBoundary){
+        saveState();
+        isWordBoundary=false;
+    }
+    if(isSpaceOrEnter||isDelete){
+        isWordBoundary=true;
+    }
+});
+
+// textEditor.addEventListener('input',(e)=>{
+//     if(e.inputType==='historyUndo'||e.inputType==='historyRedo')return;
+//     // if(e.inputType.startsWith('delete')||e.inputType==='insertLineBreak'||e.data===' '){
+//     //     saveState();
+//     // }else{}
+//     clearTimeout(inputTimeout);
+//     inputTimeout=setTimeout(()=>{
+//         saveState();
+//         lastInputType = '';
+//     },200);
+// });
+
 
 function chooseFormBtn(e){
+    if(e.ctrlKey||e.metaKey){
+        if(e.code==='KeyZ'||e.key.toLowerCase()==='z'||e.key.toLowerCase()==='я'){
+            e.preventDefault();
+            isWordBoundary=true;
+            e.shiftKey?redo():undo();
+            return;
+        }
+        if(e.code==='KeyY'||e.key.toLowerCase()==='y'||e.key.toLowerCase()==='н'){
+            e.preventDefault();
+            isWordBoundary=true;
+            redo();
+            return;
+        }
+    }
+
     let isFormattingKey=false;
     let pressedTag='';
 
@@ -240,6 +386,8 @@ function chooseFormBtn(e){
         }
     }
     if(isFormattingKey){
+        saveState();
+        isWordBoundary=true;
         const range = getRangeSelected();
         if(!range)return;
         const hasSelection=range.toString().length>0;
@@ -247,21 +395,16 @@ function chooseFormBtn(e){
     }
 }
 
-// нажатие на ctrl+someKey
-// текст выделен?получить диапазон выделения, обернуть его в необходимый тег, поменять значение кнопки:поменять значение кнопки
 
-textEditor.addEventListener('keydown',(e)=>{
-    // if()   sth for buttons if text was not selected
-    chooseFormBtn(e);
-})
-textEditor.addEventListener('mouseup',()=>{
-    checkCursorStyles();
-});
+textEditor.addEventListener('keydown',chooseFormBtn);
+textEditor.addEventListener('mouseup',checkCursorStyles);
 textEditor.addEventListener('keyup',(e)=>{
-    if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey){
-        checkCursorStyles();
-    }
+    if(!e.ctrlKey&&!e.metaKey&&!e.shiftKey)checkCursorStyles();
 });
+textEditor.addEventListener('paste',(e)=>{
+    isWordBoundary = true;
+    cleanPaste(e);
+})
 
 function initClickButtons(){
     Object.keys(btnKeys).forEach(tag=>{
@@ -273,6 +416,8 @@ function initClickButtons(){
 
             const range=getRangeSelected();
             if(!range)return;
+            saveState();
+            isWordBoundary=true;
             formateStatesList[tag]=!formateStatesList[tag];
 
             const hasSelection=range.toString().length>0;
